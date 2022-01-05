@@ -1,41 +1,32 @@
-package com.browserstack;
+ public class Parallelized extends Parameterized {
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+   private static class ThreadPoolScheduler implements RunnerScheduler {
+     private ExecutorService executor;
 
-import org.junit.runners.Parameterized;
-import org.junit.runners.model.RunnerScheduler;
+     public ThreadPoolScheduler() {
+       String threads = System.getProperty("junit.parallel.threads", "16");
+       int numThreads = Integer.parseInt(threads);
+       executor = Executors.newFixedThreadPool(numThreads);
+     }
 
-public class Parallelized extends Parameterized {
+     @Override
+     public void finished() {
+       executor.shutdown();
+       try {
+         executor.awaitTermination(10, TimeUnit.MINUTES);
+       } catch (InterruptedException exc) {
+         throw new RuntimeException(exc);
+       }
+     }
 
-  private static class ThreadPoolScheduler implements RunnerScheduler {
-    private ExecutorService executor; 
+     @Override
+     public void schedule(Runnable childStatement) {
+       executor.submit(childStatement);
+     }
+   }
 
-    public ThreadPoolScheduler() {
-      String threads = System.getProperty("junit.parallel.threads", "16");
-      int numThreads = Integer.parseInt(threads);
-      executor = Executors.newFixedThreadPool(numThreads);
-    }
-
-    @Override
-    public void finished() {
-      executor.shutdown();
-      try {
-        executor.awaitTermination(10, TimeUnit.MINUTES);
-      } catch (InterruptedException exc) {
-        throw new RuntimeException(exc);
-      }
-    }
-
-    @Override
-    public void schedule(Runnable childStatement) {
-      executor.submit(childStatement);
-    }
-  }
-
-  public Parallelized(Class klass) throws Throwable {
-    super(klass);
-    setScheduler(new ThreadPoolScheduler());
-  }
-}
+   public Parallelized(Class klass) throws Throwable {
+     super(klass);
+     setScheduler(new ThreadPoolScheduler());
+   }
+ }
